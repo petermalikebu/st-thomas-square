@@ -1,16 +1,14 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
-from werkzeug.security import generate_password_hash, check_password_hash
-from functools import wraps
 from datetime import datetime
-
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
-from werkzeug.security import check_password_hash, generate_password_hash
 from functools import wraps
+from flask import Blueprint, session, redirect, url_for, current_app
+from flask import render_template, request, flash
+from werkzeug.security import generate_password_hash, check_password_hash
+from .models import User, db  # Ensure you import User and db from your models
+from sqlalchemy import text
 
-# Define Blueprint
 main = Blueprint('main', __name__)
 
-# Utility decorators for authentication and role-based access control
+# Utility decorators
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -41,64 +39,15 @@ def signup():
         email = request.form['email']
         password = request.form['password']
 
-        db = current_app.db  # or use g.db if you set it in before_request
-        if db.users.find_one({'email': email}):
+        if User.query.filter_by(email=email).first():
             flash('Email is already registered.', 'error')
             return redirect(url_for('main.signup'))
 
         hashed_password = generate_password_hash(password)
-        db.users.insert_one({'username': username, 'email': email, 'password': hashed_password, 'role': 'user'})
-        flash('Registration successful! Please log in.', 'success')
-        return redirect(url_for('main.login'))
+        new_user = User(username=username, email=email, password=hashed_password)
+        db.session.add(new_user)
+        db.session.commit()
 
-    return render_template('signup.html')
-
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app, g
-from werkzeug.security import generate_password_hash, check_password_hash
-from functools import wraps
-from datetime import datetime
-
-# Define Blueprint
-main = Blueprint('main', __name__)
-
-# Utility decorators for authentication and role-based access control
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            flash('You must be logged in to access this page.', 'error')
-            return redirect(url_for('main.login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-def manager_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_role' not in session or session['user_role'] != 'manager':
-            flash('You must be a manager to access this page.', 'error')
-            return redirect(url_for('main.index'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-# Routes
-@main.route('/')
-def index():
-    return render_template('base.html')
-
-@main.route('/signup', methods=['GET', 'POST'])
-def signup():
-    if request.method == 'POST':
-        username = request.form['username']
-        email = request.form['email']
-        password = request.form['password']
-
-        db = current_app.db  # Use current_app.db to access the database
-        if db.users.find_one({'email': email}):
-            flash('Email is already registered.', 'error')
-            return redirect(url_for('main.signup'))
-
-        hashed_password = generate_password_hash(password)
-        db.users.insert_one({'username': username, 'email': email, 'password': hashed_password, 'role': 'user'})
         flash('Registration successful! Please log in.', 'success')
         return redirect(url_for('main.login'))
 
@@ -110,19 +59,17 @@ def login():
         email = request.form['email']
         password = request.form['password']
 
-        db = current_app.db  # Use current_app.db to access the database
-        user = db.users.find_one({'email': email})
-        if user and check_password_hash(user['password'], password):
-            session['user_id'] = str(user['_id'])
-            session['username'] = user['username']
-            session['user_role'] = user.get('role', 'user')
+        user = User.query.filter_by(email=email).first()
+        if user and check_password_hash(user.password, password):
+            session['user_id'] = str(user.id)
+            session['username'] = user.username
+            session['user_role'] = user.role
             flash('Login successful!', 'success')
             return redirect(url_for('main.dashboard'))
         else:
             flash('Invalid email or password.', 'error')
 
     return render_template('login.html')
-
 
 @main.route('/dashboard')
 @login_required
@@ -132,33 +79,36 @@ def dashboard():
 @main.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
-    db = current_app.db
-    user = db.users.find_one({'_id': session['user_id']})
+    user = User.query.get(session['user_id'])
 
     if request.method == 'POST':
-        updated_data = {
-            'name': request.form['name'],
-            'phone': request.form['phone'],
-            'email': request.form['email']
-        }
-        db.users.update_one({'_id': session['user_id']}, {'$set': updated_data})
+        user.username = request.form['name']
+        user.phone = request.form['phone']
+        user.email = request.form['email']
+        db.session.commit()
         flash('Profile updated successfully!', 'success')
         return redirect(url_for('main.profile'))
 
     return render_template('profile.html', user=user)
 
+
 @main.route('/menu/restaurant', methods=['GET'])
 @login_required
 def restaurant_menu():
-    db = current_app.db
-    menu = db.menu.find_one({'type': 'restaurant'})
+    # Use SQLAlchemy's text() function to handle raw SQL queries
+    result = db.session.execute(text("SELECT * FROM menu WHERE type='restaurant'")).fetchall()
     is_open = 9 <= datetime.now().hour <= 21
-    return render_template('restaurant_menu.html', menu=menu, is_open=is_open)
+    return render_template('restaurant_menu.html', menu=result, is_open=is_open)
+
+@main.route('/menu/bar', methods=['GET'])
+@login_required
+def bar_menu():
+    # Logic for bar menu
+    return render_template('bar_menu.html')
 
 @main.route('/menu/order', methods=['POST'])
 @login_required
 def place_order():
-    db = current_app.db
     order_details = {
         'user_id': session['user_id'],
         'food_item': request.form['food_item'],
@@ -172,56 +122,41 @@ def place_order():
         flash('Pickup time must be between 9:00 AM and 9:00 PM.', 'error')
         return redirect(url_for('main.restaurant_menu'))
 
-    db.orders.insert_one(order_details)
+    db.session.execute(
+        "INSERT INTO orders (user_id, food_item, pickup_time, status, order_time) "
+        "VALUES (:user_id, :food_item, :pickup_time, :status, :order_time)",
+        order_details
+    )
+    db.session.commit()
+
     flash('Order placed successfully!', 'success')
     return redirect(url_for('main.dashboard'))
-
-@main.route('/admin/menu', methods=['GET', 'POST'])
-@manager_required
-def update_menu():
-    db = current_app.db
-    if request.method == 'POST':
-        menu_data = request.form['menu']
-        db.menu.update_one({'type': 'restaurant'}, {'$set': {'items': menu_data}}, upsert=True)
-        flash('Menu updated successfully!', 'success')
-    menu = db.menu.find_one({'type': 'restaurant'})
-    return render_template('admin_menu.html', menu=menu)
 
 @main.route('/admin/dashboard', methods=['GET'])
 @manager_required
 def admin_dashboard():
-    db = current_app.db
-    total_orders = db.orders.count_documents({})
-    pending_orders = db.orders.count_documents({'status': 'Pending'})
-    completed_orders = db.orders.count_documents({'status': 'Completed'})
-    total_stock = sum(item['quantity'] for item in db.stock.find())
+    # Count orders for the admin dashboard
+    total_orders = db.session.execute("SELECT COUNT(*) FROM orders").scalar()
+    pending_orders = db.session.execute("SELECT COUNT(*) FROM orders WHERE status='Pending'").scalar()
+    completed_orders = db.session.execute("SELECT COUNT(*) FROM orders WHERE status='Completed'").scalar()
 
-    return render_template('admin_dashboard.html',
-                           total_orders=total_orders,
-                           pending_orders=pending_orders,
-                           completed_orders=completed_orders,
-                           total_stock=total_stock)
-
-
-@main.route('/bar', methods=['GET'])
-@login_required
-def bar_menu():
-    db = current_app.db
-    bar_events = db.events.find({'type': 'bar'})
-    bartender_on_duty = db.staff.find_one({'role': 'bartender', 'on_duty': True})
-    return render_template('bar_menu.html', events=bar_events, bartender=bartender_on_duty)
+    return render_template(
+        'admin_dashboard.html',
+        total_orders=total_orders,
+        pending_orders=pending_orders,
+        completed_orders=completed_orders,
+    )
 
 @main.route('/rooms', methods=['GET'])
 @login_required
 def room_list():
-    db = current_app.db
-    rooms = db.rooms.find()
+    # Correct the raw SQL query by wrapping it with text()
+    rooms = db.session.execute(text("SELECT * FROM rooms")).fetchall()
     return render_template('rooms.html', rooms=rooms)
 
 @main.route('/rooms/book', methods=['POST'])
 @login_required
 def book_room():
-    db = current_app.db
     room_id = request.form['room_id']
     user_details = {
         'name': request.form['name'],
@@ -229,39 +164,37 @@ def book_room():
         'arrival_date': request.form['arrival_date'],
         'hours': request.form['hours'],
     }
-    # Update room status and store booking info
-    db.rooms.update_one(
-        {'_id': room_id, 'status': 'available'},
-        {'$set': {'status': 'booked', 'booked_by': user_details}}
+
+    room = db.session.execute(
+        "SELECT * FROM rooms WHERE id=:room_id AND status='available'", {'room_id': room_id}
+    ).fetchone()
+
+    if not room:
+        flash('Room is not available.', 'error')
+        return redirect(url_for('main.room_list'))
+
+    db.session.execute(
+        "UPDATE rooms SET status='booked', booked_by=:user_details WHERE id=:room_id",
+        {'user_details': user_details, 'room_id': room_id}
     )
+    db.session.commit()
+
     flash('Room booked successfully!', 'success')
     send_booking_notification(user_details, room_id)
-    return redirect(url_for('main.room_list'))  # This should work as the endpoint is part of the 'main' blueprint
+    return redirect(url_for('main.room_list'))
 
-
+# Notification functions
 def send_booking_notification(user_details, room_id):
-    # Simulate sending an email or SMS
     message = (
         f"Hello {user_details['name']},\n\n"
         f"Your room (ID: {room_id}) is booked.\n"
         f"Arrival Date: {user_details['arrival_date']}\n"
         f"Duration: {user_details['hours']} hours\n\n"
-        "Thank you for choosing St. Thomas Square!"
+        "Thank you for choosing our service!"
     )
-    print(f"Notification sent: {message}")  # Replace with actual notification logic
-
-
-
+    print(f"Notification sent: {message}")
 
 @main.route('/logout')
 def logout():
     session.clear()
-    flash('You have been logged out.', 'info')
-    return redirect(url_for('main.index'))
-
-# Functions for notifications (can be extended with actual email/SMS APIs)
-def send_order_notification(order_details):
-    print(f"Order notification sent: {order_details}")
-
-def send_booking_notification(user_details, room_id):
-    print(f"Booking notification sent for room {room_id}: {user_details}")
+    return redirect(url_for('main.login'))

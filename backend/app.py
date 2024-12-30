@@ -1,31 +1,37 @@
-from flask import Flask, g
-from pymongo import MongoClient
-from .routes import main  # Import the main blueprint
+from flask import Flask
+from flask_migrate import Migrate
+from flask_sqlalchemy import SQLAlchemy
+
+# Import the db from the models file
+from backend.models import db  # Assuming you have a models.py file that defines db
+
 
 def create_app():
-    """Application factory to create and configure the Flask app."""
     app = Flask(__name__, template_folder="../frontend/templates", static_folder="../frontend/static")
     app.secret_key = 'your_secret_key'  # Replace with a secure key
 
-    # MongoDB setup
-    client = MongoClient('mongodb://localhost:27017/')
-    app.config['MONGO_DB'] = client['peter']  # Replace 'peter' with your database name
-    app.db = app.config['MONGO_DB']  # Set db as an attribute of the Flask app
+    # Configure SQLite database
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    @app.before_request
-    def before_request():
-        """Set the database connection to g for the current request."""
-        g.db = app.db  # Set db to g.db for use in each request
+    # Initialize Flask-Migrate with db object from models
+    migrate = Migrate(app, db)
 
-    @app.teardown_request
-    def teardown_request(exception=None):
-        """Optional: Close the database connection if needed after each request."""
-        db = getattr(g, 'db', None)
-        if db is not None:
-            # No explicit action needed for MongoDB (connection is automatically managed)
-            pass
+    # Initialize the database
+    db.init_app(app)
 
-    # Register Blueprints
-    app.register_blueprint(main)  # Register the main blueprint
+    # Example model (could also be in models.py)
+    class Menu(db.Model):
+        id = db.Column(db.Integer, primary_key=True)
+        name = db.Column(db.String(80), nullable=False)
+        type = db.Column(db.String(80), nullable=False)
+
+    # Create tables if they don't exist (can be moved to a migration script later)
+    with app.app_context():
+        db.create_all()
+
+    # Register blueprints after app initialization
+    from backend.routes import main  # Adjust path based on your file structure
+    app.register_blueprint(main)
 
     return app
