@@ -3,6 +3,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from datetime import datetime
 
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
+from werkzeug.security import check_password_hash, generate_password_hash
+from functools import wraps
+
 # Define Blueprint
 main = Blueprint('main', __name__)
 
@@ -37,7 +41,58 @@ def signup():
         email = request.form['email']
         password = request.form['password']
 
-        db = current_app.db
+        db = current_app.db  # or use g.db if you set it in before_request
+        if db.users.find_one({'email': email}):
+            flash('Email is already registered.', 'error')
+            return redirect(url_for('main.signup'))
+
+        hashed_password = generate_password_hash(password)
+        db.users.insert_one({'username': username, 'email': email, 'password': hashed_password, 'role': 'user'})
+        flash('Registration successful! Please log in.', 'success')
+        return redirect(url_for('main.login'))
+
+    return render_template('signup.html')
+
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app, g
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
+from datetime import datetime
+
+# Define Blueprint
+main = Blueprint('main', __name__)
+
+# Utility decorators for authentication and role-based access control
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('You must be logged in to access this page.', 'error')
+            return redirect(url_for('main.login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def manager_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_role' not in session or session['user_role'] != 'manager':
+            flash('You must be a manager to access this page.', 'error')
+            return redirect(url_for('main.index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Routes
+@main.route('/')
+def index():
+    return render_template('base.html')
+
+@main.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        username = request.form['username']
+        email = request.form['email']
+        password = request.form['password']
+
+        db = current_app.db  # Use current_app.db to access the database
         if db.users.find_one({'email': email}):
             flash('Email is already registered.', 'error')
             return redirect(url_for('main.signup'))
@@ -55,7 +110,7 @@ def login():
         email = request.form['email']
         password = request.form['password']
 
-        db = current_app.db
+        db = current_app.db  # Use current_app.db to access the database
         user = db.users.find_one({'email': email})
         if user and check_password_hash(user['password'], password):
             session['user_id'] = str(user['_id'])
@@ -67,6 +122,7 @@ def login():
             flash('Invalid email or password.', 'error')
 
     return render_template('login.html')
+
 
 @main.route('/dashboard')
 @login_required
