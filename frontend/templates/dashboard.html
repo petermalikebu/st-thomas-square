@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <h2>Welcome, {{ user_name }}!</h2>
+    <p>Explore our services and enjoy your stay at St. Thomas Square.</p>
+
+    <div class="service-buttons">
+        <a href="{{ url_for('main.restaurant_menu') }}" class="btn btn-primary">Restaurant</a>
+        <a href="{{ url_for('main.bar_menu') }}" class="btn btn-secondary">Bar</a>
+        <a href="{{ url_for('main.room_list') }}" class="btn btn-success">Rooms</a>
+        {% if user_role == 'manager' %}
+        <a href="{{ url_for('manager_dashboard') }}" class="btn btn-warning">Manager Panel</a>
+        {% endif %}
+    </div>
+</div>
+
+{% block extra_css %}
+<style>
+    body {
+        background-color: #f4f4f4;
+        font-family: 'Arial', sans-serif;
+        margin: 0;
+        padding: 0;
+    }
+
+    .dashboard-container {
+        text-align: center;
+        padding: 50px;
+        background-color: #ffffff;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+        margin-top: 100px;
+        width: 80%;
+        max-width: 900px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .dashboard-container h2 {
+        font-size: 2rem;
+        color: #333;
+        margin-bottom: 20px;
+    }
+
+    .dashboard-container p {
+        font-size: 1.2rem;
+        color: #777;
+        margin-bottom: 40px;
+    }
+
+    .service-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+
+    .service-buttons .btn {
+        font-size: 1.1rem;
+        padding: 12px 25px;
+        border-radius: 30px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        width: 200px;
+    }
+
+    .service-buttons .btn-primary {
+        background-color: #007bff;
+        color: white;
+        border: none;
+    }
+
+    .service-buttons .btn-primary:hover {
+        background-color: #0056b3;
+        transform: translateY(-5px);
+        box-shadow: 0 4px 10px rgba(0, 123, 255, 0.2);
+    }
+
+    .service-buttons .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+        border: none;
+    }
+
+    .service-buttons .btn-secondary:hover {
+        background-color: #5a6268;
+        transform: translateY(-5px);
+        box-shadow: 0 4px 10px rgba(108, 117, 125, 0.2);
+    }
+
+    .service-buttons .btn-success {
+        background-color: #28a745;
+        color: white;
+        border: none;
+    }
+
+    .service-buttons .btn-success:hover {
+        background-color: #218838;
+        transform: translateY(-5px);
+        box-shadow: 0 4px 10px rgba(40, 167, 69, 0.2);
+    }
+
+    .service-buttons .btn-warning {
+        background-color: #ffc107;
+        color: white;
+        border: none;
+    }
+
+    .service-buttons .btn-warning:hover {
+        background-color: #e0a800;
+        transform: translateY(-5px);
+        box-shadow: 0 4px 10px rgba(255, 193, 7, 0.2);
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Add interactivity with JavaScript if necessary
+    document.querySelectorAll('.btn').forEach(button => {
+        button.addEventListener('mouseenter', () => {
+            button.style.transform = 'scale(1.05)';
+        });
+
+        button.addEventListener('mouseleave', () => {
+            button.style.transform = 'scale(1)';
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+
+{% block title %}Stock Management{% endblock %}
+
+{% block content %}
+<div class="stock-management">
+    <h2>Manage Stock</h2>
+    <form method="POST" class="stock-form">
+        <label for="item_name">Item Name:</label>
+        <input type="text" name="item_name" required>
+
+        <label for="quantity">Quantity:</label>
+        <input type="number" name="quantity" required>
+
+        <label for="category">Category:</label>
+        <select name="category">
+            <option value="restaurant">Restaurant</option>
+            <option value="bar">Bar</option>
+        </select>
+
+        <button type="submit" class="btn-submit">Update Stock</button>
+    </form>
+
+    <h3>Current Stock</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Item Name</th>
+                <th>Quantity</th>
+                <th>Category</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in stock %}
+                <tr>
+                    <td>{{ item['item_name'] }}</td>
+                    <td>{{ item['quantity'] }}</td>
+                    <td>{{ item['category'] }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% block extra_css %}
+<style>
+    body {
+        background-color: #f4f4f9;
+        font-family: 'Arial', sans-serif;
+        margin: 0;
+        padding: 0;
+    }
+
+    .stock-management {
+        width: 80%;
+        max-width: 900px;
+        margin: 50px auto;
+        padding: 30px;
+        background-color: #ffffff;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .stock-management h2, .stock-management h3 {
+        text-align: center;
+        color: #333;
+    }
+
+    .stock-form {
+        display: grid;
+        gap: 15px;
+        margin-bottom: 30px;
+    }
+
+    .stock-form label {
+        font-size: 1rem;
+        color: #555;
+    }
+
+    .stock-form input, .stock-form select {
+        padding: 10px;
+        font-size: 1rem;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        outline: none;
+        width: 100%;
+    }
+
+    .stock-form input:focus, .stock-form select:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 5px rgba(0, 123, 255, 0.2);
+    }
+
+    .btn-submit {
+        padding: 12px 20px;
+        background-color: #007bff;
+        color: white;
+        font-size: 1rem;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s, transform 0.3s;
+        width: 100%;
+    }
+
+    .btn-submit:hover {
+        background-color: #0056b3;
+        transform: translateY(-5px);
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+
+    table th, table td {
+        padding: 12px;
+        text-align: left;
+        border: 1px solid #ddd;
+    }
+
+    table th {
+        background-color: #f1f1f1;
+        font-weight: bold;
+    }
+
+    table tr:nth-child(even) {
+        background-color: #fafafa;
+    }
+
+    table tr:hover {
+        background-color: #f1f1f1;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Form validation and interactivity (optional)
+    const submitButton = document.querySelector('.btn-submit');
+    submitButton.addEventListener('mouseenter', () => {
+        submitButton.style.transform = 'scale(1.05)';
+    });
+
+    submitButton.addEventListener('mouseleave', () => {
+        submitButton.style.transform = 'scale(1)';
+    });
+</script>
+{% endblock %}
+{% endblock %}
